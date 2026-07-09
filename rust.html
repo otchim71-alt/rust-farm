@@ -70,6 +70,9 @@
         .status-btn.active-stone { background-color: var(--stone); box-shadow: 0 0 10px var(--stone); }
         .delete-btn { color: #ef4444; cursor: pointer; margin-left: 10px; font-size: 0.9em; font-weight: bold; }
     </style>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 </head>
 <body>
 
@@ -92,22 +95,32 @@
     </div>
 
     <div class="section">
+        <div id="dbStatus" style="font-size: 0.9em; font-weight: bold; color: #a1a1aa; float: right;">Проверка связи...</div>
+        
         <h2 style="margin-top: 0; font-size: 1.3em; border-bottom: 2px solid #3f3f46; padding-bottom: 10px;">Суточный отчет:</h2>
         <div id="playersList">
             <p style="color: #a1a1aa; text-align:center;">Загрузка данных...</p>
         </div>
     </div>
+
+    <div id="debugLog" class="section" style="display: none; border: 1px solid #ef4444; background: #3b1818;">
+        <h3 style="color: #ef4444; margin-top: 0;">Окно отладки (Тут появится ошибка, если что-то сломалось):</h3>
+        <div id="debugContent" style="font-family: monospace; font-size: 0.95em;"></div>
+    </div>
 </div>
 
-<script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getDatabase, ref, set, onValue, update, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+<script>
+    // Автоматический перехват скрытых ошибок браузера
+    window.onerror = function(message, source, lineno, colno, error) {
+        document.getElementById('debugLog').style.display = 'block';
+        document.getElementById('debugContent').innerHTML += '<p style="color: #ef4444; margin: 5px 0;">❌ Ошибка скрипта: ' + message + ' (Строка: ' + lineno + ')</p>';
+        return false;
+    };
 
-    // Данные твоего проекта со скриншота + databaseURL
     const firebaseConfig = {
         apiKey: "AIzaSyB52SgZbNHyj4ixrhW0kw9UbL6WEgsvmwU",
         authDomain: "farm-5351c.firebaseapp.com",
-        databaseURL: "https://farm-5351c-default-rtdb.firebaseio.com",
+        databaseURL: "https://farm-5351c-default-rtdb.europe-west1.firebasedatabase.app",
         projectId: "farm-5351c",
         storageBucket: "farm-5351c.firebasestorage.app",
         messagingSenderId: "231801165075",
@@ -115,112 +128,125 @@
         measurementId: "G-KWVW67DN4H"
     };
 
-    // Старт базы данных
-    const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
+    if (typeof firebase === 'undefined') {
+        document.getElementById('debugLog').style.display = 'block';
+        document.getElementById('debugContent').innerHTML += '<p style="color: #ef4444;">❌ Ошибка: Скрипты Google Firebase заблокированы вашим браузером, расширением (AdBlock/uBlock) или VPN. Отключите их для этого файла.</p>';
+    } else {
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
 
-    // Функция открытия/закрытия админки
-    window.toggleAdminPanel = () => {
-        const panel = document.getElementById('adminPanel');
-        if (panel.style.display === 'block') {
-            panel.style.display = 'none';
-        } else {
-            panel.style.display = 'block';
-        }
-        // Обновляем отображение кнопок удаления при открытии панели
-        renderList();
-    };
+        // Отслеживаем коннект к облаку Google
+        database.ref('.info/connected').on('value', function(snapshot) {
+            const statusDiv = document.getElementById('dbStatus');
+            if (snapshot.val() === true) {
+                statusDiv.innerHTML = '🟢 База подключена';
+                statusDiv.style.color = '#2e7d32';
+            } else {
+                statusDiv.innerHTML = '🔴 Нет связи с базой';
+                statusDiv.style.color = '#ef4444';
+            }
+        });
 
-    // Функция добавления игрока
-    window.addPlayer = () => {
-        const nameInput = document.getElementById('playerName');
-        const name = nameInput.value.trim();
-        if(!name) return;
-        
-        const id = name.replace(/[.#$/\[\]]/g, "_");
-        
-        set(ref(db, 'players/' + id), {
-            name: name,
-            wood: false,
-            stone: false
-        }).then(() => {
-            nameInput.value = '';
-        }).catch(err => alert("Ошибка записи в базу: " + err.message));
-    };
-
-    // Функция переключения галочки сдал/не сдал
-    window.toggleStatus = (id, type, currentStatus) => {
-        const updates = {};
-        updates[`players/${id}/${type}`] = !currentStatus;
-        update(ref(db), updates);
-    };
-
-    // Функция удаления соклановца
-    window.deletePlayer = (id) => {
-        if(confirm("Удалить игрока из списка?")) {
-            remove(ref(db, 'players/' + id));
-        }
-    };
-
-    // Функция полного сброса
-    window.resetAll = () => {
-        if(confirm("Сбросить статус нормы у ВСЕХ игроков?")) {
-            onValue(ref(db, 'players'), (snapshot) => {
-                const data = snapshot.val();
-                if(!data) return;
-                const updates = {};
-                for(let id in data) {
-                    updates[`players/${id}/wood`] = false;
-                    updates[`players/${id}/stone`] = false;
-                }
-                update(ref(db), updates);
-            }, { onlyOnce: true });
-        }
-    };
-
-    const playersListDiv = document.getElementById('playersList');
-    let currentData = null;
-
-    // Отрисовка списка на экране
-    function renderList() {
-        playersListDiv.innerHTML = '';
-        
-        if (!currentData) {
-            playersListDiv.innerHTML = '<p style="color: #a1a1aa; text-align:center;">Список пуст. Открой "Режим Лидера" и добавь людей.</p>';
-            return;
-        }
-
-        const panel = document.getElementById('adminPanel');
-        const isAdminVisible = panel && panel.style.display === 'block';
-
-        for (let id in currentData) {
-            const player = currentData[id];
-            const row = document.createElement('div');
-            row.className = 'player-row';
+        window.toggleAdminPanel = function() {
+            const panel = document.getElementById('adminPanel');
+            if (!panel) return;
+            panel.style.display = (panel.style.display === 'block') ? 'none' : 'block';
             
-            row.innerHTML = `
-                <div class="player-name">
-                    ${player.name}
-                    <span class="delete-btn" style="display: ${isAdminVisible ? 'inline' : 'none'};" onclick="deletePlayer('${id}')">[❌]</span>
-                </div>
-                <div class="buttons-group">
-                    <button class="status-btn ${player.wood ? 'active-wood' : ''}" onclick="toggleStatus('${id}', 'wood', ${player.wood})">
-                        ${player.wood ? '🪵 Сдал' : '🪵 Не сдал'}
-                    </button>
-                    <button class="status-btn ${player.stone ? 'active-stone' : ''}" onclick="toggleStatus('${id}', 'stone', ${player.stone})">
-                        ${player.stone ? '🪨 Сдал' : '🪨 Не сдал'}
-                    </button>
-                </div>
-            `;
-            playersListDiv.appendChild(row);
-        }
-    }
+            database.ref('players').once('value', function(snapshot) {
+                renderList(snapshot.val());
+            });
+        };
 
-    // Слушаем базу данных Firebase в реальном времени
-    onValue(ref(db, 'players'), (snapshot) => {
-        currentData = snapshot.val();
-        renderList();
-    });
+        window.addPlayer = function() {
+            const nameInput = document.getElementById('playerName');
+            if (!nameInput) return;
+            const name = nameInput.value.trim();
+            if(!name) {
+                alert("Сначала введи ник соклановца!");
+                return;
+            }
+            
+            const id = name.replace(/[.#$/\[\]]/g, "_");
+            
+            database.ref('players/' + id).set({
+                name: name,
+                wood: false,
+                stone: false
+            }).then(function() {
+                nameInput.value = '';
+            }).catch(function(err) {
+                document.getElementById('debugLog').style.display = 'block';
+                document.getElementById('debugContent').innerHTML += '<p style="color: #ef4444;">❌ Ошибка Firebase при добавлении: ' + err.message + '</p>';
+            });
+        };
+
+        window.toggleStatus = function(id, type, currentStatus) {
+            const updates = {};
+            updates[type] = !currentStatus;
+            database.ref('players/' + id).update(updates).catch(function(err) {
+                alert("Ошибка изменения статуса: " + err.message);
+            });
+        };
+
+        window.deletePlayer = function(id) {
+            if(confirm("Удалить игрока из списка?")) {
+                database.ref('players/' + id).remove();
+            }
+        };
+
+        window.resetAll = function() {
+            if(confirm("Сбросить статус нормы у ВСЕХ игроков?")) {
+                database.ref('players').once('value', function(snapshot) {
+                    const data = snapshot.val();
+                    if(!data) return;
+                    for(let id in data) {
+                        database.ref('players/' + id).update({ wood: false, stone: false });
+                    }
+                });
+            }
+        };
+
+        const playersListDiv = document.getElementById('playersList');
+
+        function renderList(data) {
+            if (!playersListDiv) return;
+            playersListDiv.innerHTML = '';
+            
+            if (!data) {
+                playersListDiv.innerHTML = '<p style="color: #a1a1aa; text-align:center;">Список пуст. Открой "Режим Лидера" и добавь людей.</p>';
+                return;
+            }
+
+            const panel = document.getElementById('adminPanel');
+            const isAdminVisible = panel && panel.style.display === 'block';
+
+            for (let id in data) {
+                const player = data[id];
+                const row = document.createElement('div');
+                row.className = 'player-row';
+                
+                row.innerHTML = `
+                    <div class="player-name">
+                        ${player.name}
+                        <span class="delete-btn" style="display: ${isAdminVisible ? 'inline' : 'none'};" onclick="deletePlayer('${id}')">[❌]</span>
+                    </div>
+                    <div class="buttons-group">
+                        <button class="status-btn ${player.wood ? 'active-wood' : ''}" onclick="toggleStatus('${id}', 'wood', ${player.wood})">
+                            ${player.wood ? '🪵 Сдал' : '🪵 Не сдал'}
+                        </button>
+                        <button class="status-btn ${player.stone ? 'active-stone' : ''}" onclick="toggleStatus('${id}', 'stone', ${player.stone})">
+                            ${player.stone ? '🪨 Сдал' : '🪨 Не сдал'}
+                        </button>
+                    </div>
+                `;
+                playersListDiv.appendChild(row);
+            }
+        }
+
+        database.ref('players').on('value', function(snapshot) {
+            renderList(snapshot.val());
+        });
+    }
 </script>
 </body>
 </html>
