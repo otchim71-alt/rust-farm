@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rust Farm - Контроль нормы</title>
+    <style>
+        :root {
+            --bg: #1e1e24;
+            --card: #2a2a32;
+            --accent: #cd412b;
+            --text: #e2e8f0;
+            --wood: #a0522d;
+            --stone: #708090;
+            --sulfur: #f1c40f;
+            --iron: #7f8c8d;
+            --gold: #f1c40f;
+        }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            padding: 20px;
+            margin: 0;
+        }
+        .container { max-width: 800px; margin: 0 auto; }
+        h1 { text-align: center; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 30px; }
+        h1 span { color: var(--accent); }
+        .section {
+            background: var(--card);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+            margin-bottom: 20px;
+        }
+        .admin-panel { 
+            border: 1px dashed var(--accent); 
+            display: none; 
+        }
+        .flex-row { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+        input[type="text"] {
+            background: #18181b; border: 1px solid #3f3f46;
+            color: #fff; padding: 10px; border-radius: 4px; flex-grow: 1;
+            min-width: 130px;
+        }
+        button {
+            background: var(--accent); color: #fff; border: none;
+            padding: 10px 15px; border-radius: 4px; cursor: pointer; font-weight: bold;
+        }
+        button.secondary { background: #4b5563; }
+        
+        .player-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 10px;
+            border-bottom: 1px solid #3f3f46;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .player-name { font-size: 1.1em; font-weight: 600; min-width: 200px; }
+        .player-norms { font-size: 0.82em; color: #a1a1aa; margin-top: 6px; font-weight: normal; line-height: 1.4; }
+        .buttons-group { display: flex; gap: 6px; flex-wrap: wrap; }
+        
+        .status-btn {
+            background: #3f3f46;
+            color: #fff;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            min-width: 90px;
+            font-size: 0.85em;
+            transition: all 0.2s ease;
+        }
+        .status-btn.active-wood { background-color: var(--wood); box-shadow: 0 0 8px var(--wood); }
+        .status-btn.active-stone { background-color: var(--stone); box-shadow: 0 0 8px var(--stone); }
+        .status-btn.active-sulfur { background-color: var(--sulfur); color: #000; box-shadow: 0 0 8px var(--sulfur); }
+        .status-btn.active-iron { background-color: var(--iron); box-shadow: 0 0 8px var(--iron); }
+        .delete-btn { color: #ef4444; cursor: pointer; margin-left: 10px; font-size: 0.9em; font-weight: bold; }
+
+        /* Стили для Доски Почета */
+        .leaderboard-title {
+            margin-top: 0;
+            font-size: 1.4em;
+            color: var(--gold);
+            text-transform: uppercase;
+            border-bottom: 2px solid #3f3f46;
+            padding-bottom: 10px;
+            letter-spacing: 1px;
+        }
+        .leaderboard-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 6px;
+            background: #232329;
+            font-size: 1.05em;
+        }
+        .top-farmila {
+            background: linear-gradient(90deg, rgba(241,196,15,0.15) 0%, rgba(205,65,43,0.1) 100%);
+            border: 1px solid var(--gold);
+            font-weight: bold;
+        }
+        .badge-farmila {
+            background: var(--accent);
+            color: #fff;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            text-transform: uppercase;
+            box-shadow: 0 0 8px var(--accent);
+        }
+    </style>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+</head>
+<body>
+
+<div class="container">
+    <h1><span>RUST</span> Контроль нормы</h1>
+    
+    <div style="text-align: right; margin-bottom: 15px;">
+        <button class="secondary" onclick="toggleAdminPanel()">⚙️ Режим Лидера</button>
+    </div>
+
+    <div id="adminPanel" class="section admin-panel">
+        <h3 style="margin-top:0;">Добавить бойца и настроить нормы</h3>
+        <div class="flex-row">
+            <input type="text" id="playerName" placeholder="Ник соклановца">
+            <input type="text" id="normWood" placeholder="Норма Дерева (напр. 20к)">
+            <input type="text" id="normStone" placeholder="Норма Камня (напр. 15к)">
+            <input type="text" id="normSulfur" placeholder="Норма Серы (напр. 5к)">
+            <input type="text" id="normIron" placeholder="Норма Железа (напр. 10к)">
+            <button onclick="addPlayer()">Добавить</button>
+        </div>
+        <div style="margin-top: 25px; text-align: right;">
+            <button onclick="resetAll()" style="background: #b91c1c;">🔄 Вручную обнулить ресурсы у всех</button>
+        </div>
+    </div>
+
+    <div class="section" style="border: 1px solid rgba(241,196,15,0.3);">
+        <h2 class="leaderboard-title">🏆 ДОСКА ПОЧЕТА 🏆</h2>
+        <div id="leaderboardList">
+            <p style="color: #a1a1aa; text-align:center;">Расчет рейтингов...</p>
+        </div>
+    </div>
+
+    <div class="section">
+        <div id="dbStatus" style="font-size: 0.9em; font-weight: bold; color: #a1a1aa; float: right;">Проверка связи...</div>
+        
+        <h2 style="margin-top: 0; font-size: 1.3em; border-bottom: 2px solid #3f3f46; padding-bottom: 10px;">Суточный отчетресурсов:</h2>
+        <div id="playersList">
+            <p style="color: #a1a1aa; text-align:center;">Загрузка данных...</p>
+        </div>
+    </div>
+</div>
+
+<script>
+    const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1525106273421623447/ac0RjtpRW5t23eFDwm-PuMfmpIEqpLruIKfxCS6dsnQjZX5Z3u41LQYiqDnuNYrgV4rW";
+    const LEADER_PASSWORD = "rust"; 
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyB52SgZbNHyj4ixrhW0kw9UbL6WEgsvmwU",
+        authDomain: "farm-5351c.firebaseapp.com",
+        databaseURL: "https://farm-5351c-default-rtdb.europe-west1.firebasedatabase.app",
+        projectId: "farm-5351c",
+        storageBucket: "farm-5351c.firebasestorage.app",
+        messagingSenderId: "231801165075",
+        appId: "1:231801165075:web:2e872ea1b2c7e235b7f6e6",
+        measurementId: "G-KWVW67DN4H"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+
+    // Функция автоматического сброса на новый день
+    function checkDailyReset() {
+        const todayStr = new Date().toLocaleDateString('ru-RU'); // Формат ДД.ММ.ГГГГ
+        
+        database.ref('metadata/lastResetDate').once('value', function(snapshot) {
+            const lastResetDate = snapshot.val();
+            
+            if (lastResetDate !== todayStr) {
+                // Наступил новый день! Обновляем дату сброса в базе
+                database.ref('metadata/lastResetDate').set(todayStr).then(function() {
+                    // Сбрасываем галочки у всех игроков
+                    database.ref('players').once('value', function(playersSnapshot) {
+                        const players = playersSnapshot.val();
+                        if (!players) return;
+                        
+                        for (let id in players) {
+                            database.ref('players/' + id).update({
+                                wood: false,
+                                stone: false,
+                                sulfur: false,
+                                iron: false
+                            });
+                        }
+                        console.log("Автоматический сброс ресурсов выполнен успешно!");
+                    });
+                });
+            }
+        });
+    }
+
+    database.ref('.info/connected').on('value', function(snapshot) {
+        const statusDiv = document.getElementById('dbStatus');
+        if (snapshot.val() === true) {
+            statusDiv.innerHTML = '🟢 База подключена';
+            statusDiv.style.color = '#2e7d32';
+            checkDailyReset(); // Проверяем автосброс при коннекте
+        } else {
+            statusDiv.innerHTML = '🔴 Нет связи с базой';
+            statusDiv.style.color = '#ef4444';
+        }
+    });
+
+    function sendDiscordNotification(playerName, type) {
+        if (!DISCORD_WEBHOOK_URL) return;
+
+        let resourceName = '';
+        let color = 0;
+
+        if (type === 'wood') { resourceName = '🪵 Дерево'; color = 10506805; }
+        else if (type === 'stone') { resourceName = '🪨 Камень'; color = 7372944; }
+        else if (type === 'sulfur') { resourceName = '🟨 Сера'; color = 15844367; }
+        else if (type === 'iron') { resourceName = '🧱 Железо'; color = 8359053; }
+
+        const payload = {
+            username: "Контроль Шкафа",
+            avatar_url: "https://files.facepunch.com/lewis/1b2911b1/rust-logo.png",
+            embeds: [{
+                title: "⛏️ Норма фарма выполнена!",
+                description: `Игрок **${playerName}** закинул ресурсы и закрыл норму.`,
+                color: color,
+                fields: [
+                    { name: "Соклановец", value: playerName, inline: true },
+                    { name: "Что сдано", value: resourceName, inline: true }
+                ],
+                timestamp: new Date().toISOString()
+            }]
+        };
+
+        fetch(DISCORD_WEBHOOK_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        }).catch(err => console.error("Ошибка вебхука:", err));
+    }
+
+    window.toggleAdminPanel = function() {
+        const panel = document.getElementById('adminPanel');
+        if (!panel) return;
+        
+        if (panel.style.display !== 'block') {
+            const pass = prompt("Введите пароль лидера:");
+            if (pass !== LEADER_PASSWORD) {
+                alert("Неверный пароль!");
+                return;
+            }
+        }
+
+        panel.style.display = (panel.style.display === 'block') ? 'none' : 'block';
+        
+        database.ref('players').once('value', function(snapshot) {
+            renderList(snapshot.val());
+        });
+    };
+
+    window.addPlayer = function() {
+        const nameInput = document.getElementById('playerName');
+        const woodInput = document.getElementById('normWood');
+        const stoneInput = document.getElementById('normStone');
+        const sulfurInput = document.getElementById('normSulfur');
+        const ironInput = document.getElementById('normIron');
+        
+        if (!nameInput) return;
+        
+        const name = nameInput.value.trim();
+        const normWood = woodInput.value.trim() || "Не задана";
+        const normStone = stoneInput.value.trim() || "Не задана";
+        const normSulfur = sulfurInput.value.trim() || "Не задана";
+        const normIron = ironInput.value.trim() || "Не задана";
+        
+        if(!name) {
+            alert("Сначала введи ник соклановца!");
+            return;
+        }
+        
+        const id = name.replace(/[.#$/\[\]]/g, "_");
+        
+        database.ref('players/' + id).set({
+            name: name,
+            normWood: normWood,
+            normStone: normStone,
+            normSulfur: normSulfur,
+            normIron: normIron,
+            wood: false,
+            stone: false,
+            sulfur: false,
+            iron: false,
+            totalPoints: 0 // Инициализируем очки
+        }).then(function() {
+            nameInput.value = '';
+            woodInput.value = '';
+            stoneInput.value = '';
+            sulfurInput.value = '';
+            ironInput.value = '';
+        });
+    };
+
+    // Изменение статуса фарма с перерасчетом очков (Доска Почета)
+    window.toggleStatus = function(id, type, currentStatus, playerName) {
+        const nextStatus = !currentStatus;
+        
+        database.ref('players/' + id).once('value', function(snapshot) {
+            const player = snapshot.val();
+            if(!player) return;
+            
+            let currentPoints = player.totalPoints || 0;
+            // Плюс очко если сдал, минус очко если снял галочку
+            if (nextStatus) {
+                currentPoints += 1;
+            } else {
+                currentPoints = Math.max(0, currentPoints - 1);
+            }
+
+            const updates = {};
+            updates[type] = nextStatus;
+            updates['totalPoints'] = currentPoints;
+
+            database.ref('players/' + id).update(updates).then(function() {
+                if (nextStatus) {
+                    sendDiscordNotification(playerName, type);
+                }
+            });
+        });
+    };
+
+    window.deletePlayer = function(id) {
+        if(confirm("Удалить игрока из списка?")) {
+            database.ref('players/' + id).remove();
+        }
+    };
+
+    window.resetAll = function() {
+        if(confirm("Сбросить статус нормы у ВСЕХ игроков вручную? (Очки доски почета останутся)")) {
+            database.ref('players').once('value', function(snapshot) {
+                const data = snapshot.val();
+                if(!data) return;
+                for(let id in data) {
+                    database.ref('players/' + id).update({ wood: false, stone: false, sulfur: false, iron: false });
+                }
+            });
+        }
+    };
+
+    const playersListDiv = document.getElementById('playersList');
+    const leaderboardListDiv = document.getElementById('leaderboardList');
+
+    function renderList(data) {
+        if (!playersListDiv || !leaderboardListDiv) return;
+        
+        playersListDiv.innerHTML = '';
+        leaderboardListDiv.innerHTML = '';
+        
+        if (!data) {
+            playersListDiv.innerHTML = '<p style="color: #a1a1aa; text-align:center;">Список пуст. Открой "Режим Лидера" и добавь людей.</p>';
+            leaderboardListDiv.innerHTML = '<p style="color: #a1a1aa; text-align:center;">Пока нет данных для рейтинга.</p>';
+            return;
+        }
+
+        const panel = document.getElementById('adminPanel');
+        const isAdminVisible = panel && panel.style.display === 'block';
+
+        // Переводим объект в массив для сортировки доски почета
+        let playersArray = [];
+        for (let id in data) {
+            playersArray.push({ id: id, ...data[id] });
+        }
+
+        // Сортируем массив по очкам от большего к меньшему
+        playersArray.sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0));
+
+        // 1. ОТРИСОВКА ДОСКИ ПОЧЕТА
+        playersArray.forEach((player, index) => {
+            const points = player.totalPoints || 0;
+            const item = document.createElement('div');
+            item.className = 'leaderboard-item';
+            
+            // Если игрок на первом месте и у него больше 0 очков — он "фармила года"
+            if (index === 0 && points > 0) {
+                item.className += ' top-farmila';
+                item.innerHTML = `
+                    <span>👑 <b>${player.name}</b></span>
+                    <span style="display: flex; gap: 10px; align-items: center;">
+                        <span class="badge-farmila">фармила года</span>
+                        <span style="color: var(--gold); font-weight: bold;">${points} очков</span>
+                    </span>
+                `;
+            } else {
+                item.innerHTML = `
+                    <span>${index + 1}. ${player.name}</span>
+                    <span style="color: #a1a1aa;">${points} очков</span>
+                `;
+            }
+            leaderboardListDiv.appendChild(item);
+        });
+
+        // 2. ОТРИСОВКА СУТОЧНОГО ОТЧЕТА РЕСУРСОВ
+        for (let id in data) {
+            const player = data[id];
+            const row = document.createElement('div');
+            row.className = 'player-row';
+            
+            const isWood = player.wood || false;
+            const isStone = player.stone || false;
+            const isSulfur = player.sulfur || false;
+            const isIron = player.iron || false;
+
+            const nWood = player.normWood || 'Не задана';
+            const nStone = player.normStone || 'Не задана';
+            const nSulfur = player.normSulfur || 'Не задана';
+            const nIron = player.normIron || 'Не задана';
+
+            const safeName = player.name.replace(/'/g, "\\'");
+
+            row.innerHTML = `
+                <div class="player-name">
+                    ${player.name}
+                    <span class="delete-btn" style="display: ${isAdminVisible ? 'inline' : 'none'};" onclick="deletePlayer('${id}')">[❌]</span>
+                    <div class="player-norms">
+                        🪵 Норма: <b>${nWood}</b> | 🪨 Норма: <b>${nStone}</b><br>
+                        🟨 Норма: <b>${nSulfur}</b> | 🧱 Норма: <b>${nIron}</b>
+                    </div>
+                </div>
+                <div class="buttons-group">
+                    <button class="status-btn ${isWood ? 'active-wood' : ''}" onclick="toggleStatus('${id}', 'wood', ${isWood}, '${safeName}')">
+                        ${isWood ? '🪵 Сдал' : '🪵 Не сдал'}
+                    </button>
+                    <button class="status-btn ${isStone ? 'active-stone' : ''}" onclick="toggleStatus('${id}', 'stone', ${isStone}, '${safeName}')">
+                        ${isStone ? '🪨 Сдал' : '🪨 Не сдал'}
+                    </button>
+                    <button class="status-btn ${isSulfur ? 'active-sulfur' : ''}" onclick="toggleStatus('${id}', 'sulfur', ${isSulfur}, '${safeName}')">
+                        ${isSulfur ? '🟨 Сдал' : '🟨 Не сдал'}
+                    </button>
+                    <button class="status-btn ${isIron ? 'active-iron' : ''}" onclick="toggleStatus('${id}', 'iron', ${isIron}, '${safeName}')">
+                        ${isIron ? '🧱 Сдал' : '🧱 Не сдал'}
+                    </button>
+                </div>
+            `;
+            playersListDiv.appendChild(row);
+        }
+    }
+
+    database.ref('players').on('value', function(snapshot) {
+        renderList(snapshot.val());
+    });
+</script>
+</body>
+</html>
