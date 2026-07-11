@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rust Clan HQ - Управление Вайпом</title>
+    <style>
+        :root {
+            --bg: #1e1e24;
+            --card: #2a2a32;
+            --accent: #cd412b;
+            --text: #e2e8f0;
+            --wood: #a0522d;
+            --stone: #708090;
+            --sulfur: #f1c40f;
+            --iron: #7f8c8d;
+            --gold: #f1c40f;
+            --raid: #e74c3c;
+            --green: #2e7d32;
+        }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: linear-gradient(rgba(20, 20, 24, 0.85), rgba(20, 20, 24, 0.92)), 
+                        url('https://images.alphacoders.com/605/605593.jpg') no-repeat center center fixed;
+            background-size: cover;
+            color: var(--text);
+            padding: 20px;
+            margin: 0;
+        }
+        .container { max-width: 850px; margin: 0 auto; }
+        h1 { text-align: center; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 20px; text-shadow: 2px 2px 8px rgba(0,0,0,0.7); }
+        h1 span { color: var(--accent); }
+        
+        .section {
+            background: var(--card);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            margin-bottom: 20px;
+            backdrop-filter: blur(5px);
+        }
+        
+        .admin-panel { border: 1px dashed var(--accent); display: none; }
+        .flex-row { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+        
+        input[type="text"], input[type="number"] {
+            background: #18181b; border: 1px solid #3f3f46;
+            color: #fff; padding: 10px; border-radius: 4px; flex-grow: 1; min-width: 120px;
+        }
+        
+        button {
+            background: var(--accent); color: #fff; border: none;
+            padding: 10px 15px; border-radius: 4px; cursor: pointer; font-weight: bold;
+            transition: all 0.2s ease;
+        }
+        button:hover { filter: brightness(1.2); }
+        button.secondary { background: #4b5563; }
+        
+        .raid-btn {
+            background: var(--raid); width: 100%; padding: 15px; font-size: 1.2em;
+            text-transform: uppercase; letter-spacing: 2px; box-shadow: 0 0 15px var(--raid);
+            margin-bottom: 20px; animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 10px rgba(231,76,60,0.6); }
+            50% { box-shadow: 0 0 25px rgba(231,76,60,1); }
+            100% { box-shadow: 0 0 10px rgba(231,76,60,0.6); }
+        }
+
+        .links-row { display: flex; gap: 10px; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; }
+        .link-btn {
+            flex: 1; min-width: 120px; text-align: center; background: #232329;
+            color: #fff; text-decoration: none; padding: 10px; border-radius: 4px;
+            font-weight: bold; border: 1px solid #3f3f46; transition: background 0.2s;
+        }
+        .link-btn:hover { background: #3f3f46; border-color: var(--accent); }
+
+        .goal-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; background: #1e1e24; padding: 10px 15px; border-radius: 6px; }
+        .goal-info { flex-grow: 1; margin-right: 20px; }
+        .goal-name { font-weight: bold; font-size: 1.05em; margin-bottom: 5px; }
+        .progress-bg { background: #3f3f46; height: 10px; border-radius: 5px; overflow: hidden; }
+        .progress-bar { background: var(--accent); height: 100%; width: 0%; transition: width 0.3s; }
+        .goal-controls { display: flex; gap: 5px; align-items: center; }
+        .goal-counter { font-family: monospace; font-size: 1.1em; font-weight: bold; min-width: 70px; text-align: center; }
+        .btn-small { padding: 5px 12px; font-size: 1.1em; background: #3f3f46; }
+
+        .player-row { display: flex; justify-content: space-between; align-items: center; padding: 15px 10px; border-bottom: 1px solid #3f3f46; flex-wrap: wrap; gap: 15px; }
+        .player-name { font-size: 1.1em; font-weight: 600; min-width: 180px; }
+        .player-norms { font-size: 0.82em; color: #a1a1aa; margin-top: 6px; font-weight: normal; line-height: 1.4; }
+        .buttons-group { display: flex; gap: 6px; flex-wrap: wrap; }
+        
+        .status-btn {
+            background: #3f3f46; color: #fff; border: none; padding: 8px 12px; border-radius: 4px;
+            cursor: pointer; font-weight: bold; min-width: 105px; font-size: 0.85em; transition: all 0.2s ease;
+        }
+        .status-btn.active-wood { background-color: var(--wood); box-shadow: 0 0 8px var(--wood); }
+        .status-btn.active-stone { background-color: var(--stone); box-shadow: 0 0 8px var(--stone); }
+        .status-btn.active-sulfur { background-color: var(--sulfur); color: #000; box-shadow: 0 0 8px var(--sulfur); }
+        .status-btn.active-iron { background-color: var(--iron); box-shadow: 0 0 8px var(--iron); }
+        .delete-btn { color: #ef4444; cursor: pointer; margin-left: 10px; font-size: 0.9em; font-weight: bold; }
+
+        .leaderboard-title { margin-top: 0; font-size: 1.4em; color: var(--gold); text-transform: uppercase; border-bottom: 2px solid #3f3f46; padding-bottom: 10px; letter-spacing: 1px; }
+        .leaderboard-item { display: flex; justify-content: space-between; padding: 10px; border-radius: 4px; margin-bottom: 6px; background: #232329; }
+        .top-farmila { background: linear-gradient(90deg, rgba(241,196,15,0.15) 0%, rgba(205,65,43,0.1) 100%); border: 1px solid var(--gold); font-weight: bold; }
+        .badge-farmila { background: var(--accent); color: #fff; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; text-transform: uppercase; box-shadow: 0 0 8px var(--accent); }
+
+        /* Стили для заявок модерации */
+        .request-item { display: flex; justify-content: space-between; align-items: center; background: #1e1e24; padding: 12px 15px; border-radius: 6px; margin-bottom: 8px; border-left: 3px solid var(--gold); flex-wrap: wrap; gap: 10px; }
+        .request-info { font-size: 0.95em; }
+        .request-info b { color: #fff; }
+        .request-info a { color: var(--gold); text-decoration: underline; font-weight: bold; }
+        .req-btn-accept { background: var(--green); padding: 6px 12px; font-size: 0.85em; }
+        .req-btn-decline { background: var(--raid); padding: 6px 12px; font-size: 0.85em; }
+    </style>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+</head>
+<body>
+
+<div class="container">
+    <div style="text-align: center; margin-bottom: 10px; margin-top: 10px;">
+        <img src="https://files.facepunch.com/lewis/1b2911b1/rust-logo.png" style="width: 120px; filter: drop-shadow(0 0 10px var(--accent));">
+    </div>
+
+    <h1><span>RUST</span> Командный Центр</h1>
+
+    <button class="raid-btn" onclick="triggerRaidAlert()">🚨 Объявить Рейд-Тревогу (@everyone) 🚨</button>
+
+    <div class="links-row">
+        <a href="https://rustlabs.com" target="_blank" class="link-btn">🛠️ Rust Labs</a>
+        <a href="https://www.battlemetrics.com/servers/rust" target="_blank" class="link-btn">📊 Battlemetrics</a>
+        <a href="https://rustmaps.com" target="_blank" class="link-btn">🗺️ Rust Maps</a>
+    </div>
+
+    <div class="section" style="border: 1px solid var(--gold);">
+        <h2 style="margin-top:0; font-size: 1.3em; text-transform: uppercase; color: var(--gold);">⏳ Заявки на подтверждение фарма</h2>
+        <div id="requestsContainer">
+            <p style="color: #a1a1aa; text-align:center; margin: 0;">Нет активных заявок. Все шкафы проверены!</p>
+        </div>
+    </div>
+
+    <div class="section" style="border-left: 4px solid var(--accent);">
+        <h2 style="margin-top:0; font-size: 1.3em; text-transform: uppercase; color: #fff;">🚀 Глобальные Цели Клана</h2>
+        <div id="goalsContainer"></div>
+    </div>
+    
+    <div style="text-align: right; margin-bottom: 15px;">
+        <button class="secondary" onclick="toggleAdminPanel()">⚙️ Режим Лидера</button>
+    </div>
+
+    <div id="adminPanel" class="section admin-panel">
+        <h3 style="margin-top:0;">Добавить бойца и настроить нормы</h3>
+        <div class="flex-row">
+            <input type="text" id="playerName" placeholder="Ник соклановца">
+            <input type="text" id="normWood" placeholder="Норма Дерева (напр. 20к)">
+            <input type="text" id="normStone" placeholder="Норма Камня (напр. 15к)">
+            <input type="text" id="normSulfur" placeholder="Норма Серы (напр. 5к)">
+            <input type="text" id="normIron" placeholder="Норма Железа (напр. 10к)">
+            <button onclick="addPlayer()">Добавить</button>
+        </div>
+
+        <h3 style="margin-top:20px;">Настройка Глобальных Целей (Лимиты)</h3>
+        <div class="flex-row">
+            <input type="number" id="targetRockets" placeholder="Цель Ракет">
+            <input type="number" id="targetC4" placeholder="Цель C4">
+            <input type="number" id="targetExplosive" placeholder="Цель Взрывных">
+            <button onclick="updateWipeTargets()" style="background: #2e7d32;">Сохранить Цели</button>
+        </div>
+
+        <div style="margin-top: 25px; text-align: right;">
+            <button onclick="resetAll()" style="background: #b91c1c;">🔄 Вручную обнулить ресурсы у всех</button>
+        </div>
+    </div>
+
+    <div class="section" style="border: 1px solid rgba(241,196,15,0.3);">
+        <h2 class="leaderboard-title">🏆 ДОСКА ПОЧЕТА 🏆</h2>
+        <div id="leaderboardList">
+            <p style="color: #a1a1aa; text-align:center;">Расчет рейтингов...</p>
+        </div>
+    </div>
+
+    <div class="section">
+        <div id="dbStatus" style="font-size: 0.9em; font-weight: bold; color: #a1a1aa; float: right;">Проверка связи...</div>
+        <h2 style="margin-top: 0; font-size: 1.3em; border-bottom: 2px solid #3f3f46; padding-bottom: 10px;">Суточный отчет ресурсов:</h2>
+        <div id="playersList">
+            <p style="color: #a1a1aa; text-align:center;">Загрузка данных...</p>
+        </div>
+    </div>
+</div>
+
+<script>
+    const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1525106273421623447/ac0RjtpRW5t23eFDwm-PuMfmpIEqpLruIKfxCS6dsnQjZX5Z3u41LQYiqDnuNYrgV4rW";
+    const LEADER_PASSWORD = "rust"; 
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyB52SgZbNHyj4ixrhW0kw9UbL6WEgsvmwU",
+        authDomain: "farm-5351c.firebaseapp.com",
+        databaseURL: "https://farm-5351c-default-rtdb.europe-west1.firebasedatabase.app",
+        projectId: "farm-5351c",
+        storageBucket: "farm-5351c.firebasestorage.app",
+        messagingSenderId: "231801165075",
+        appId: "1:231801165075:web:2e872ea1b2c7e235b7f6e6",
+        measurementId: "G-KWVW67DN4H"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+
+    let isLeaderMode = false; // Переменная сессии лидера
+
+    function playCodeLockSound() {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        let time = ctx.currentTime;
+        for (let i = 0; i < 3; i++) {
+            let osc = ctx.createOscillator(); let gain = ctx.createGain();
+            osc.frequency.setValueAtTime(1800, time); gain.gain.setValueAtTime(0.08, time);
+            gain.gain.exponentialRampToValueAtTime(0.001, time + 0.06);
+            osc.connect(gain); gain.connect(ctx.destination);
+            osc.start(time); osc.stop(time + 0.06); time += 0.09;
+        }
+        let oscClick = ctx.createOscillator(); let gainClick = ctx.createGain();
+        oscClick.type = 'triangle'; oscClick.frequency.setValueAtTime(120, time);
+        gainClick.gain.setValueAtTime(0.15, time); gainClick.gain.exponentialRampToValueAtTime(0.001, time + 0.04);
+        oscClick.connect(gainClick); gainClick.connect(ctx.destination);
+        oscClick.start(time); oscClick.stop(time + 0.04);
+    }
+
+    function playHitSound() {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        let time = ctx.currentTime; let osc = ctx.createOscillator(); let gain = ctx.createGain();
+        osc.frequency.setValueAtTime(950, time); osc.frequency.exponentialRampToValueAtTime(150, time + 0.08);
+        gain.gain.setValueAtTime(0.12, time); gain.gain.exponentialRampToValueAtTime(0.001, time + 0.08);
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.start(time); osc.stop(time + 0.08);
+    }
+
+    function checkDailyReset() {
+        const todayStr = new Date().toLocaleDateString('ru-RU');
+        database.ref('metadata/lastResetDate').once('value', function(snapshot) {
+            if (snapshot.val() !== todayStr) {
+                database.ref('metadata/lastResetDate').set(todayStr).then(function() {
+                    database.ref('players').once('value', function(pSnap) {
+                        const players = pSnap.val(); if (!players) return;
+                        for (let id in players) {
+                            database.ref('players/' + id).update({ wood: 0, stone: 0, sulfur: 0, iron: 0 });
+                        }
+                    });
+                });
+            }
+        });
+    }
+
+    database.ref('.info/connected').on('value', function(snapshot) {
+        const statusDiv = document.getElementById('dbStatus');
+        if (snapshot.val() === true) {
+            statusDiv.innerHTML = '🟢 База подключена'; statusDiv.style.color = '#2e7d32';
+            checkDailyReset();
+        } else {
+            statusDiv.innerHTML = '🔴 Нет связи с базой'; statusDiv.style.color = '#ef4444';
+        }
+    });
+
+    window.triggerRaidAlert = function() {
+        if(!confirm("⚠️ Вы уверены, что хотите объявить РЕЙД-ТРЕВОГУ?")) return;
+        const payload = {
+            content: "@everyone 🚨🚨🚨 **БАЗУ РЕЙДЯТ! ВСЕ В ИГРУ СРОЧНО! ДЕФАЕМ!** 🚨🚨🚨",
+            username: "🚨 СИРЕНА БАЗЫ 🚨", avatar_url: "https://cdn-icons-png.flaticon.com/512/595/595067.png"
+        };
+        fetch(DISCORD_WEBHOOK_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) })
+        .then(() => alert("🚨 Сигнал тревоги отправлен!"));
+    };
+
+    function sendDiscordNotification(playerName, type, amount, totalAmount) {
+        if (!DISCORD_WEBHOOK_URL) return;
+        let resourceName = '', color = 0;
+        if (type === 'wood') { resourceName = '🪵 Дерево'; color = 10506805; }
+        else if (type === 'stone') { resourceName = '🪨 Камень'; color = 7372944; }
+        else if (type === 'sulfur') { resourceName = '🟨 Сера'; color = 15844367; }
+        else if (type === 'iron') { resourceName = '🔩 Металл'; color = 8359053; }
+
+        const payload = {
+            username: "Контроль Шкафа", avatar_url: "https://files.facepunch.com/lewis/1b2911b1/rust-logo.png",
+            embeds: [{
+                title: "✅ Лог шкафа: Сдача подтверждена Лидером!",
+                description: `Ресурсы от игрока **${playerName}** проверены в ТРе и зачислены на баланс.`,
+                color: color,
+                fields: [
+                    { name: "Соклановец", value: playerName, inline: true },
+                    { name: "Ресурс", value: resourceName, inline: true },
+                    { name: "Поставка", value: `+${amount.toLocaleString()}`, inline: true },
+                    { name: "Всего в шкафу за день", value: `${totalAmount.toLocaleString()}`, inline: true }
+                ],
+                timestamp: new Date().toISOString()
+            }]
+        };
+        fetch(DISCORD_WEBHOOK_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+    }
+
+    window.updateWipeTargets = function() {
+        database.ref('goals').update({
+            rockets_target: parseInt(document.getElementById('targetRockets').value) || 0,
+            c4_target: parseInt(document.getElementById('targetC4').value) || 0,
+            explosive_target: parseInt(document.getElementById('targetExplosive').value) || 0
+        }).then(() => alert("Цели вайпа сохранены!"));
+    };
+
+    window.changeGoalValue = function(type, step) {
+        playHitSound();
+        database.ref('goals/' + type).once('value', function(snap) {
+            database.ref('goals/' + type).set(Math.max(0, (snap.val() || 0) + step));
+        });
+    };
+
+    window.toggleAdminPanel = function() {
+        const panel = document.getElementById('adminPanel');
+        if (panel.style.display !== 'block') {
+            if (prompt("Введите пароль лидера:") !== LEADER_PASSWORD) return alert("Неверный пароль!");
+            playCodeLockSound();
+            isLeaderMode = true;
+        } else {
+            isLeaderMode = false;
+        }
+        panel.style.display = (panel.style.display === 'block') ? 'none' : 'block';
+        // Обновляем списки, чтобы показать/скрыть кнопки модерации заявок
+        database.ref('players').once('value', snapshot => renderPlayers(snapshot.val()));
+        database.ref('requests').once('value', snapshot => renderRequests(snapshot.val()));
+    };
+
+    window.addPlayer = function() {
+        const nameInput = document.getElementById('playerName'); const name = nameInput.value.trim();
+        if(!name) return alert("Введи ник!");
+        const id = name.replace(/[.#$/\[\]]/g, "_");
+        database.ref('players/' + id).set({
+            name: name,
+            normWood: document.getElementById('normWood').value.trim() || "Нет",
+            normStone: document.getElementById('normStone').value.trim() || "Нет",
+            normSulfur: document.getElementById('normSulfur').value.trim() || "Нет",
+            normIron: document.getElementById('normIron').value.trim() || "Нет",
+            wood: 0, stone: 0, sulfur: 0, iron: 0, totalPoints: 0
+        }).then(() => {
+            nameInput.value = ''; document.getElementById('normWood').value = '';
+            document.getElementById('normStone').value = ''; document.getElementById('normSulfur').value = '';
+            document.getElementById('normIron').value = '';
+        });
+    };
+
+    // Создание ЗАЯВКИ на смену (С подтверждением)
+    window.addFarmAmount = function(id, type, playerName) {
+        let resTitle = type === 'wood' ? 'Дерево 🪵' : type === 'stone' ? 'Камень 🪨' : type === 'sulfur' ? 'Сера 🟨' : 'Металл 🔩';
+        const inputAmount = prompt(`Сколько ресурса (${resTitle}) ты закинул в шкаф?`);
+        if (inputAmount === null) return;
+        
+        const amount = parseInt(inputAmount.replace(/\s+/g, ''));
+        if (isNaN(amount) || amount <= 0) return alert("Введите правильное число!");
+
+        const screenshotLink = prompt("Вставь ссылку на скриншот шкафа/инвентаря для подтверждения (необязательно):", "");
+        const finalLink = screenshotLink ? screenshotLink.trim() : "";
+
+        playHitSound();
+
+        // Пушим новую заявку в базу данных
+        database.ref('requests').push({
+            playerId: id,
+            playerName: playerName,
+            resourceType: type,
+            amount: amount,
+            link: finalLink,
+            timestamp: new Date().toLocaleTimeString('ru-RU')
+        }).then(() => {
+            alert("Заявка успешно отправлена! Ожидайте проверки Лидером клана. Ресурсы зачислятся после одобрения.");
+        });
+    };
+
+    // Функция МОДЕРАЦИИ: Одобрить заявку
+    window.acceptRequest = function(reqId, pId, type, amount, pName) {
+        if (!isLeaderMode) return alert("Включите 'Режим Лидера' через пароль!");
+        playHitSound();
+
+        database.ref('players/' + pId).once('value', function(snapshot) {
+            const player = snapshot.val();
+            if(!player) return database.ref('requests/' + reqId).remove();
+
+            let currentAmount = parseInt(player[type]) || 0;
+            let nextAmount = currentAmount + amount;
+            let nextPoints = (player.totalPoints || 0) + 1;
+
+            const updates = {};
+            updates[type] = nextAmount;
+            updates['totalPoints'] = nextPoints;
+
+            // Обновляем баланс игрока и удаляем заявку
+            database.ref('players/' + pId).update(updates).then(function() {
+                database.ref('requests/' + reqId).remove().then(function() {
+                    sendDiscordNotification(pName, type, amount, nextAmount);
+                });
+            });
+        });
+    };
+
+    // Функция МОДЕРАЦИИ: Отклонить заявку
+    window.declineRequest = function(reqId) {
+        if (!isLeaderMode) return alert("Включите 'Режим Лидера' через пароль!");
+        if (confirm("Отклонить и удалить эту заявку? Ресурсы начислены не будут.")) {
+            database.ref('requests/' + reqId).remove();
+        }
+    };
+
+    window.deletePlayer = function(id) {
+        if(confirm("Удалить игрока?")) database.ref('players/' + id).remove();
+    };
+
+    window.resetAll = function() {
+        if(confirm("Обнулить суточные ресурсы у всех вручную?")) {
+            database.ref('players').once('value', function(snapshot) {
+                const data = snapshot.val();
+                for(let id in data) database.ref('players/' + id).update({ wood: 0, stone: 0, sulfur: 0, iron: 0 });
+            });
+        }
+    };
+
+    function renderGoals(goalsData) {
+        const container = document.getElementById('goalsContainer'); container.innerHTML = ''; const data = goalsData || {};
+        const items = [
+            { key: 'rockets', label: '🚀 Ракеты', current: data.rockets || 0, target: data.rockets_target || 0 },
+            { key: 'c4', label: '💣 Заряды C4', current: data.c4 || 0, target: data.c4_target || 0 },
+            { key: 'explosive', label: '💥 Взрывные патроны', current: data.explosive || 0, target: data.explosive_target || 0 }
+        ];
+        items.forEach(item => {
+            const percent = item.target > 0 ? Math.min((item.current / item.target) * 100, 100) : 0;
+            const div = document.createElement('div'); div.className = 'goal-row';
+            div.innerHTML = `
+                <div class="goal-info">
+                    <div class="goal-name">${item.label}</div>
+                    <div class="progress-bg"><div class="progress-bar" style="width: ${percent}%"></div></div>
+                </div>
+                <div class="goal-controls">
+                    <button class="status-btn btn-small" onclick="changeGoalValue('${item.key}', -1)">-</button>
+                    <div class="goal-counter">${item.current} / ${item.target}</div>
+                    <button class="status-btn btn-small" onclick="changeGoalValue('${item.key}', 1)">+</button>
+                </div>
+            `;
+            container.appendChild(div);
+        });
+    }
+
+    // Рендеринг ЗАЯВОК НА ПРОВЕРКУ
+    function renderRequests(reqsData) {
+        const reqsContainer = document.getElementById('requestsContainer');
+        if (!reqsContainer) return;
+        reqsContainer.innerHTML = '';
+
+        if (!reqsData) {
+            reqsContainer.innerHTML = '<p style="color: #a1a1aa; text-align:center; margin: 0;">Нет активных заявок. Все шкафы проверены!</p>';
+            return;
+        }
+
+        for (let reqId in reqsData) {
+            const req = reqsData[reqId];
+            let resName = req.resourceType === 'wood' ? '🪵 Дерево' : req.resourceType === 'stone' ? '🪨 Камень' : req.resourceType === 'sulfur' ? '🟨 Сера' : '🔩 Металл';
+            
+            const div = document.createElement('div');
+            div.className = 'request-item';
+
+            let linkHtml = req.link ? `<a href="${req.link}" target="_blank">[Смотреть скрин]</a>` : '<span style="color:#71717a;">[Без скрина]</span>';
+
+            div.innerHTML = `
+                <div class="request-info">
+                    [${req.timestamp}] Игрок <b>${req.playerName}</b> сдал <b>${req.amount.toLocaleString()}</b> ресурса ${resName} ${linkHtml}
+                </div>
+                <div style="display: ${isLeaderMode ? 'flex' : 'none'}; gap: 5px;">
+                    <button class="req-btn-accept" onclick="acceptRequest('${reqId}', '${req.playerId}', '${req.resourceType}', ${req.amount}, '${req.playerName}')">Принять</button>
+                    <button class="req-btn-decline" onclick="declineRequest('${reqId}')">Отклонить</button>
+                </div>
+            `;
+            reqsContainer.appendChild(div);
+        }
+    }
+
+    function renderPlayers(data) {
+        const playersListDiv = document.getElementById('playersList'); const leaderboardListDiv = document.getElementById('leaderboardList');
+        playersListDiv.innerHTML = ''; leaderboardListDiv.innerHTML = '';
+        if (!data) {
+            playersListDiv.innerHTML = '<p style="text-align:center;color:#a1a1aa;">Список пуст.</p>';
+            leaderboardListDiv.innerHTML = '<p style="text-align:center;color:#a1a1aa;">Нет данных.</p>'; return;
+        }
+        let playersArray = []; for (let id in data) playersArray.push({ id: id, ...data[id] });
+        playersArray.sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0));
+
+        playersArray.forEach((player, idx) => {
+            const pts = player.totalPoints || 0; const item = document.createElement('div'); item.className = 'leaderboard-item';
+            if (idx === 0 && pts > 0) {
+                item.className += ' top-farmila';
+                item.innerHTML = `<span>👑 <b>${player.name}</b></span><span style="display:flex;gap:10px;align-items:center;"><span class="badge-farmila">фармила года</span><span style="color:var(--gold);font-weight:bold;">${pts} раз проверен</span></span>`;
+            } else {
+                item.innerHTML = `<span>${idx + 1}. ${player.name}</span><span style="color:#a1a1aa;">${pts} поставок</span>`;
+            }
+            leaderboardListDiv.appendChild(item);
+        });
+
+        const isAdminVisible = document.getElementById('adminPanel').style.display === 'block';
+        for (let id in data) {
+            const p = data[id]; const row = document.createElement('div'); row.className = 'player-row'; const safeName = p.name.replace(/'/g, "\\'");
+            const vWood = parseInt(p.wood) || 0; const vStone = parseInt(p.stone) || 0; const vSulfur = parseInt(p.sulfur) || 0; const vIron = parseInt(p.iron) || 0;
+
+            row.innerHTML = `
+                <div class="player-name">
+                    ${p.name} <span class="delete-btn" style="display: ${isAdminVisible ? 'inline' : 'none'};" onclick="deletePlayer('${id}')">[❌]</span>
+                    <div class="player-norms">
+                        🪵 Норма: <b>${p.normWood || 'Нет'}</b> | 🪨 Норма: <b>${p.normStone || 'Нет'}</b><br>
+                        🟨 Норма: <b>${p.normSulfur || 'Нет'}</b> | 🔩 Норма: <b>${p.normIron || 'Нет'}</b>
+                    </div>
+                </div>
+                <div class="buttons-group">
+                    <button class="status-btn ${vWood > 0 ? 'active-wood' : ''}" onclick="addFarmAmount('${id}', 'wood', '${safeName}')">🪵 ${vWood.toLocaleString()}</button>
+                    <button class="status-btn ${vStone > 0 ? 'active-stone' : ''}" onclick="addFarmAmount('${id}', 'stone', '${safeName}')">🪨 ${vStone.toLocaleString()}</button>
+                    <button class="status-btn ${vSulfur > 0 ? 'active-sulfur' : ''}" onclick="addFarmAmount('${id}', 'sulfur', '${safeName}')">🟨 ${vSulfur.toLocaleString()}</button>
+                    <button class="status-btn ${vIron > 0 ? 'active-iron' : ''}" onclick="addFarmAmount('${id}', 'iron', '${safeName}')">🔩 ${vIron.toLocaleString()}</button>
+                </div>
+            `;
+            playersListDiv.appendChild(row);
+        }
+    }
+
+    // Слушатели базы Firebase в реальном времени
+    database.ref('goals').on('value', snapshot => renderGoals(snapshot.val()));
+    database.ref('players').on('value', snapshot => renderPlayers(snapshot.val()));
+    database.ref('requests').on('value', snapshot => renderRequests(snapshot.val()));
+</script>
+</body>
+</html>
